@@ -1,0 +1,139 @@
+body{
+    padding: 0;
+    margin: 0;
+}
+
+.wrapper{
+    box-sizing: border-box;
+    padding: 40px 60px;
+    background-color: #002d4c;
+    min-height: 100vh;
+}
+
+.terminal{
+    box-sizing: border-box;
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 40px;
+    border-radius: 20px;
+    background-color: #39287b;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+}
+
+.terminal-gap{
+    /* height: 1px;
+    background-color: #5c5cf3;
+    padding: 0 20px; */
+    margin-top: 20px;
+}
+
+.terminal-controls{
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-size: 15px;
+    user-select: none;
+}
+
+.terminal-controls__button{
+    padding: 10px 20px;
+    border-radius: 10px;
+    line-height: 20px;
+    background-color: #b92cc1;
+    color: #ffffff;
+}
+
+.tcb-cancel{
+    background-color: #ff2020;
+}
+
+.terminal-controls__button:hover{
+    background-color: #e4861b;
+    box-shadow: 2px 3px 20px 2px #c3a5007a;
+    cursor: pointer;
+}
+
+.terminal__status{
+    margin-left: auto;
+    display: flex;
+    gap: 10px;
+}
+
+.status{
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    --active: #20f020;
+    --stopped: #f02020;
+    --waiting: #5a5a5a;
+}
+
+.terminal-text{
+    max-height: 1000px;
+    overflow-y: hidden;
+    word-break: break-word;
+    padding: 10px;
+    border: 2px solid #5c5cf3;
+    /* box-shadow: 0px 0px 8px 1px #5c5cf3; */
+    border-radius: 10px;
+    outline: none;
+    color: #ffffff;
+    background-color: transparent;
+    font-size: 15px;
+}
+
+.terminal-text span::after {
+    content: "";
+    width: 5px;
+    height: 15px;
+    margin-left: 2px;
+    margin-bottom: -1px;
+    background: #ffffff;
+    display: inline-block;
+    animation: cursor-blink 1s steps(2) infinite;
+}
+
+svg{
+    width: 100%;
+    height: auto;
+}
+
+.modal-container{
+    position: absolute;
+    top: 0;
+    z-index: 1;
+}
+
+.tooltip{
+    position: relative;
+    top: 0;
+    left: calc(50vw - 150px);
+    scale: 1 0;
+    width: 300px;
+    padding: 10px 20px;
+    box-sizing: border-box;
+    border-radius: 10px;
+    background-color: #5a5a5a;
+    color: #ffffff;
+    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 15px;
+    transition-duration: .5s;
+}
+
+.tooltip-enable{
+    top: 50px;
+    scale: 1 1;
+}
+
+.hidden{
+    display: none;
+}
+
+@keyframes cursor-blink {
+    0% {
+        opacity: 0;
+    }
+}
