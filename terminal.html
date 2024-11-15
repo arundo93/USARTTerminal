@@ -1,0 +1,100 @@
+<!DOCTYPE html> 
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Terminal</title>
+        <link rel="stylesheet" href="styles.css">
+        <script src="script.js"></script>
+        <script src="d3.v7.js"></script>
+        <script src="plot.js"></script>
+    </head>
+    <body>
+        <div class="wrapper">
+            <div class="terminal">
+                <div class="terminal-header">USART Терминал</div>
+                <div class="terminal-controls">
+                    <div class="terminal-controls__button" id="connectDevice">Выбрать устройство</div>
+                    <div class="terminal-controls__button tcb-cancel hidden" id="disconnectDevice">Отключиться</div>
+                    <div class="terminal-controls__select">
+                        <div class="terminal-controls__title">Скорость передачи</div>
+                        <div class="terminal-controls__button" id="decSpeed">&lt;</div>
+                        <div class="terminal-controls__text" id="baudRate"></div>
+                        <div class="terminal-controls__button" id="incSpeed">&gt;</div>
+                    </div>
+                    <div class="terminal__status">
+                        <div class="status" id="deviceStatus"></div>
+                    </div>
+                </div>
+                <div class="terminal-gap"></div>
+                <div class="terminal-controls">
+                    <div class="terminal-controls__button" id="readDataFromDevice">Читать данные</div>
+                    <div class="terminal-controls__button tcb-cancel hidden" id="stopReadingData">Остановить</div>
+                    <div class="terminal-controls__button tcb-cancel hidden" id="clearData">Очистить</div>
+                    <div class="terminal-controls__button tcb-cancel hidden" id="saveData">Скачать</div>
+                    <div class="terminal-controls__select">
+                        <div class="terminal-controls__title">Тип данных</div>
+                        <div class="terminal-controls__button" id="switchDataTypeL">&lt;</div>
+                        <div class="terminal-controls__text" id="dataType"></div>
+                        <div class="terminal-controls__button" id="switchDataTypeR">&gt;</div>
+                    </div>
+                    <div class="terminal__status">
+                        <div class="status" id="readerStatus"></div>
+                    </div>
+                </div>
+                <div class="terminal-text">
+                    <span id="terminalText">
+                        Text...
+                    </span>
+                </div>
+                <div class="terminal-gap"></div>
+                <div class="terminal-controls">
+                    <div class="terminal-controls__button" id="sendData">Отправить данные</div>
+                </div>
+                <input class="terminal-text" type="text">
+                <div class="terminal-gap"></div>
+                <div class="terminal-controls">
+                    <div class="terminal-controls__button" id="readChartFromDevice">Строить график</div>
+                    <div class="terminal-controls__button tcb-cancel hidden" id="stopReadingChart">Остановить</div>
+                    <div class="terminal__status">
+                        <div class="status" id="chartStatus"></div>
+                    </div>
+                </div>
+                <div class="terminal-plot">
+                    <svg width="1000" height="300" viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <style>
+                                text{
+                                    --bgColor: #000000;
+                                    --gridColor: #FC0FC0;
+                                    --signalColor: #FFB800;
+                                    --textColor: #A601D0;
+                                    --activeColor: #70FF00;
+                                }
+                            </style>
+                        </defs>
+                        <rect width="1000" height="300" fill="black"/>
+                        <path d="M-0.5 29H1000" stroke="#FC0FC0" stroke-dasharray="1 39"></path>
+                        <path d="M-0.5 59H1000" stroke="#FC0FC0" stroke-dasharray="1 39"></path>
+                        <path d="M-0.5 89H1000" stroke="#FC0FC0" stroke-dasharray="1 39"></path>
+                        <path d="M-0.5 119H1000" stroke="#FC0FC0" stroke-dasharray="1 39"></path>
+                        <path d="M-0.5 179H1000" stroke="#FC0FC0" stroke-dasharray="1 39"></path>
+                        <path d="M-0.5 209H1000" stroke="#FC0FC0" stroke-dasharray="1 39"></path>
+                        <path d="M-0.5 239H1000" stroke="#FC0FC0" stroke-dasharray="1 39"></path>
+                        <path d="M-0.5 269H1000" stroke="#FC0FC0" stroke-dasharray="1 39"></path>
+                        <path d="M-0.5 149H1000" stroke="#FC0FC0"></path>
+                        <text id="oscPeriod" x="65" y="15" fill="var(--textColor)" font-size="15" style="text-anchor: middle;"></text>
+                        <text id="oscFrequency" x="195" y="15" fill="var(--textColor)" font-size="15" style="text-anchor: middle;"></text>
+                        <text id="oscVolts" x="325" y="15" fill="var(--textColor)" font-size="15" style="text-anchor: middle;"></text>
+                        <circle cx="390" cy="10" r="5" fill="var(--bgColor)"></circle>
+                        <path id="signal" d="M-1 150" fill="none" stroke="#FFB800"></path>
+                    </svg>
+                </div>
+                <div class="terminal-plot" id="d3jsPlot"></div>
+            </div>
+        </div>
+        <div class="modal-container">
+            <div class="tooltips"></div>
+        </div>
+    </body>
+</html>

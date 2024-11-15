@@ -4,6 +4,7 @@ function RingBuffer(size){
     this.ptrEnd = 0;
     this.dataLen = 0;
     this.size = size;
+    //put element to buffer end
     this.putToEnd = function(byte){
         if(this.dataLen >= this.size){
             return 0;
@@ -16,6 +17,7 @@ function RingBuffer(size){
         }
         return 1;
     }
+    //get element from buffer begin
     this.getFromBegin = function(){
         if(!this.dataLen){
             return undefined;
@@ -28,6 +30,7 @@ function RingBuffer(size){
         }
         return result;
     }
+    //clear buffer
     this.erase = function(){
         this.ptrBegin = 0;
         this.ptrEnd = 0;
@@ -50,10 +53,10 @@ let oscilloscope = {
     init: function(){
         window.addEventListener("load", () => {
             this.line = document.getElementById("signal").getAttribute("d");
-            //console.log(this.line);
             this.drawOsc();
         });
     },
+    //put bytes from chunk to ringBuffer
     putBytesToArray: function(chunk){
         const deltaTime = (new Date - this.lastChunkTime);
         if(Math.floor(deltaTime / 10) === Math.floor(this.period / 10) && !this.sync){
@@ -64,10 +67,21 @@ let oscilloscope = {
         }
         if(deltaTime < 10000 && deltaTime > this.period){
             this.period = deltaTime;
+            let p = Math.ceil(this.period / 100) *25;
+            let f = 1000 / p + "Гц";
+            if(p > 1000){
+                p = (p / 1000 | 0) + "с";
+            }
+            else{
+                p += "мс"
+            }
+            document.getElementById("oscPeriod").innerHTML = p;
+            document.getElementById("oscFrequency").innerHTML = f;
         }
         this.lastChunkTime = new Date();
         for(let byte of chunk){
             if(!this.ringBuffer.putToEnd(byte)){
+                console.log("Buffer is full!");
                 break;
             }
         }
@@ -75,6 +89,7 @@ let oscilloscope = {
             this.drawOsc();
         }
     },
+    //create SVG line depends on data from ringBuffer
     drawOsc: function(){
         return new Promise((resolve, reject) => {
             if(this.ringBuffer.dataLen < 2){
@@ -85,18 +100,20 @@ let oscilloscope = {
             if(highByte & 0xF0){
                 highByte = lowByte;
                 lowByte = this.ringBuffer.getFromBegin();
-            }
-            if(this.index >= 160){
-                this.index = 0;
-                this.line = "M-1 150";
+                // console.log("Warning!");
+                // console.log((((highByte & 0xFF) << 8) + lowByte));
             }
             if(typeof lowByte != "undefined"){
                 let point = parseInt((((highByte & 0xF) << 8) + lowByte - 2048) * 1089 / 4096);
                 this.line += `L${this.index * 2} ${150 - point}`;
                 this.index++;
-                document.getElementById("signal").setAttribute("d", this.line);
             }
-            if(this.ringBuffer.dataLen > 2){
+            if(this.index >= 160){
+                this.index = 0;
+                document.getElementById("signal").setAttribute("d", this.line);
+                this.line = "M-1 150";
+            }
+            if(this.ringBuffer.dataLen > 1){
                 resolve(1);
             }
             resolve(0);
@@ -107,28 +124,231 @@ let oscilloscope = {
             }
         })
     },
+    //clear SVG line
     clearOsc: function(){
         this.line = "M-1 150";
         document.getElementById("signal").setAttribute("d", this.line);
     }
 }
 
+let vacmeter = {
+    ringBuffer: new RingBuffer(4096),
+    dataX: [],
+    dataY: [],
+    drawD3jsPlot: 1,
+    startStr: new TextEncoder().encode("start"),
+    stopStr: new TextEncoder().encode("stop"),
+    index: 0,
+    status: {
+        counter: 0,
+        startIdx: -1,
+        stopIdx: -1,
+        drawing: 0
+    },
+    line: undefined,
+    init: function(){
+        window.addEventListener("load", () => {
+            this.line = document.getElementById("signal").getAttribute("d");
+        });
+    },
+    //put bytes from chunk to ringBuffer
+    putBytesToArray: function(chunk){
+        for(let byte = 0; byte < chunk.length; byte++){
+            if(!this.ringBuffer.putToEnd(chunk[byte])){
+                console.log("Buffer is full!");
+                this.ringBuffer.erase();
+                break;
+            }
+            if(this.status.startIdx === -1){
+                if(chunk[byte] === this.startStr[this.status.counter]){
+                    this.status.counter++;
+                }
+                else{
+                    this.status.counter = 0;
+                }
+                if(this.status.counter === this.startStr.length){
+                    this.status.startIdx = this.ringBuffer.ptrEnd;
+                    this.status.counter = 0;
+                }
+            }
+            if(this.status.stopIdx === -1 && this.status.startIdx > -1){
+                if(chunk[byte] === this.stopStr[this.status.counter]){
+                    this.status.counter++;
+                }
+                else{
+                    this.status.counter = 0;
+                }
+                if(this.status.counter === this.stopStr.length){
+                    this.status.stopIdx = this.ringBuffer.ptrEnd - this.stopStr.length;
+                    if(this.status.stopIdx < 0){
+                        this.status.stopIdx += this.ringBuffer.size;
+                    }
+                    this.status.counter = 0;
+                }
+            }
+        }
+        if(this.status.startIdx > -1 && this.status.stopIdx > -1){
+            const ptrBegin = this.status.startIdx;
+            const ptrEnd = this.status.stopIdx;
+            this.ringBuffer.dataLen = (ptrEnd > ptrBegin ? ptrEnd - ptrBegin : this.ringBuffer.size + ptrEnd - ptrBegin);
+            this.ringBuffer.ptrBegin = ptrBegin;
+            this.ringBuffer.ptrEnd = ptrEnd;
+            //console.log(this.ringBuffer.dataLen);
+            //console.log(this.ringBuffer.buffer.join(", "));
+            this.drawVac();
+        }
+    },
+    //create SVG line depends on data from ringBuffer
+    drawVac: function(){
+        //maxHeight: 300
+        //maxWidth: 1000
+        return new Promise((resolve, reject) => {
+            //console.log(this.ringBuffer.dataLen);
+            if(this.ringBuffer.dataLen < 2){
+                resolve(0);
+            }
+            let lowByte = this.ringBuffer.getFromBegin();
+            let highByte = this.ringBuffer.getFromBegin();
+            //let lowX = this.ringBuffer.getFromBegin();
+            //let highX = this.ringBuffer.getFromBegin();
+            this.dataY.push((highByte << 8) + lowByte);
+            //this.dataX.push((highX << 8) + lowX);
+            //console.log([highByte, lowByte]);
+            if(highByte & 0xF0){
+                //highByte = lowByte;
+                //lowByte = this.ringBuffer.getFromBegin();
+                console.log("Warning!");
+                console.log((((highByte & 0xFF) << 8) + lowByte).toString(16));
+            }
+            if(typeof lowByte != "undefined"){
+                let point = parseInt((((highByte) << 8) + lowByte) * 300 / 4096);
+                this.line += `L${this.index * 2} ${300 - point}`;
+                this.index++;
+            }
+            if(this.index % 10 === 0){
+                document.getElementById("signal").setAttribute("d", this.line);
+            }
+            if(this.index >= 500){
+                this.index = 0;
+                document.getElementById("signal").setAttribute("d", this.line);
+                this.line = "M-1 150";
+            }
+            if(this.ringBuffer.dataLen > 1){
+                resolve(1);
+            }
+            resolve(0);
+        }).then((res) => {
+            this.status.drawing = res;
+            if(res){
+                return this.drawVac();
+            }
+            else{
+                if(this.drawD3jsPlot){
+                    if(typeof(plot) === "function" && this.dataY.length){
+                        // const minX = Math.min(...this.dataX);
+                        // const maxX =  Math.max(...this.dataX);
+                        const minX = 0;
+                        const maxX =  3.3;
+                        function prettify(x, offset){
+                            return (minX + (maxX - minX) * offset);
+                        }
+                        this.dataX = this.dataY.map((y, idx) => {return prettify(y, idx / this.dataY.length)});
+                        let start = -1;
+                        let finish = -1;
+                        for(let i = 10; i < this.dataY.length - 10; i++){
+                            if((this.dataY[i - 10] + this.dataY[i - 5] + this.dataY[i] + this.dataY[i + 5] + this.dataY[i + 10]) > 0){
+                                if(start === -1){
+                                    start = i;
+                                }
+                                else{
+                                    finish = i;
+                                }
+                            }
+                            else if(start > -1 && finish === -1){
+                                finish = i;
+                            }
+                        }
+                        let node;
+                        if(start > -1 && finish > -1){
+                            this.dataX = this.dataX.slice(start, finish);
+                            this.dataY = this.dataY.slice(start, finish);
+                            y = this.dataY.map((y, idx) => {
+                                if(idx < 2 || idx > this.dataY.length - 2){
+                                    return(y * 35.37 / 4096);
+                                }
+                                else{
+                                    return((this.dataY[idx - 2] + this.dataY[idx - 1] + y + this.dataY[idx + 1] + this.dataY[idx + 2]) * 7.074 / 4096);
+                                }
+                            });
+                            node = plot(this.dataX.map((x, idx) => ({x, y: y[idx]})));
+                        }
+                        if(node){
+                            const container = document.getElementById("d3jsPlot");
+                            while (container.firstChild) {
+                                container.removeChild(container.firstChild);
+                            }
+                            document.getElementById("d3jsPlot").append(node);
+                        }
+                    }
+                }
+                //this.drawD3jsPlot = 0;
+                this.dataX = [];
+                this.dataY = [];
+                this.index = 0;
+                this.status.drawing = 0;
+                this.status.startIdx = -1;
+                this.status.stopIdx = -1;
+                this.ringBuffer.erase();
+                this.line = "M-1 150";
+            }
+        })
+    },
+    //clear SVG line
+    clearVac: function(){
+        this.index = 0;
+        this.status.drawing = 0;
+        this.status.startIdx = -1;
+        this.status.stopIdx = -1;
+        this.ringBuffer.erase();
+        this.line = "M-1 150";
+        document.getElementById("signal").setAttribute("d", this.line);
+    }
+}
+
+
 let serialPortManager = {
     serialPort: undefined,
     reader: undefined,
+    fileContent: "",
+    fileLength: 0,
+    decoder: {
+        dataTypes: ["HEX", "Текст"],
+        currentType: 0,
+    },
     terminalText: undefined,
     deviceFilters: [
-        { usbVendorId: 0x0403},
+        //{ usbVendorId: 0x0403},
     ],
-    portParams: {
-        baudRate: 38400,
-        bufferSize: 1024,
+    port: {
+        deviceFilters: [],
+        portParams: {
+            baudRate: 300,
+            bufferSize: 1024,
+        },
+        baudRates: [300, 600, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600],
+        currentBaudRate: 0,
     },
     controlsIDs: {
         connect: "connectDevice",
+        incBaud: "incSpeed",
+        decBaud: "decSpeed",
         disconnect: "disconnectDevice",
         startReading: "readDataFromDevice",
         stopReading: "stopReadingData",
+        clearText: "clearData",
+        downloadText: "saveData",
+        decodeData: "switchDataTypeL",
+        decodeDataR: "switchDataTypeR",
         startDrawing: "readChartFromDevice",
         stopDrawing: "stopReadingChart",
     },
@@ -141,22 +361,45 @@ let serialPortManager = {
         try{
             if(!navigator.serial){
                 console.log("No serial Port support in your browser!");
-                this.showNotification("No serial Port support in your browser!")
                 return false;
             }
         }
         catch(err){
-            console.error(err);
             this.showNotification(err.message);
+            console.trace(err);
             return false;
         }
         return true;
     },
-    init: function(){
-        if(!this.checkNavigator()){
-            return;
+    copyToClipboard: function(text){
+        if(navigator.clipboard){
+            navigator.clipboard.writeText(text + "").then((r) => {
+                this.showNotification("Copied to clipboard");
+            }).catch((err) => {
+                this.showNotification(err.message);
+                console.trace(err);
+            });
         }
+        else{
+            this.showNotification("uups, no clipboard support");
+        }
+    },
+    saveToFile: function(content, filename){
+        const href = URL.createObjectURL(new Blob([content + ""], { type: 'text/plain' }));
+        const a = document.createElement("a");
+        a.style = "display: none";
+        document.body.appendChild(a);
+        a.href = href;
+        a.download = "" + filename;
+        a.click();
+    },
+    init: function(){
         window.addEventListener("load", () => {
+            if(!this.checkNavigator()){
+                this.showNotification("No serial Port support in your browser!<br>More information about <a href='https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API'>Web Serial API</a>");
+                return;
+            }
+            this.showNotification("Добро пожаловать!<br>Это терминал для работы с USART<br><a href='https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API'>Как это работает</a>");
             document.querySelector(".terminal").addEventListener("click", (event) => {
                 if(event.target.id){
                     this.terminalControls(event.target.id);
@@ -166,6 +409,9 @@ let serialPortManager = {
             this.updateTerminalStatus({type: "device", value: "waiting"});
             this.updateTerminalStatus({type: "text", value: "stopped"});
             this.updateTerminalStatus({type: "chart", value: "stopped"});
+            document.getElementById("baudRate").innerHTML = `${this.port.baudRates[this.port.currentBaudRate]} бод`;
+            document.getElementById("dataType").innerHTML = this.decoder.dataTypes[this.decoder.currentType];
+            this.port.portParams.baudRate = this.port.baudRates[this.port.currentBaudRate];
         });
     },
     connectToPort: function(){
@@ -174,7 +420,7 @@ let serialPortManager = {
         }
         navigator.serial.requestPort({filters: this.deviceFilters}).then((port) => {
             if(port){
-                return port.open(this.portParams).then(()=>{
+                return port.open(this.port.portParams).then(()=>{
                     this.serialPort = port;
                     this.portStatus.connected = true;
                     this.showNotification("Connected!");
@@ -184,6 +430,13 @@ let serialPortManager = {
             }
         }).catch((err) => {
             this.showNotification(err.message);
+            console.trace(err);
+            if(navigator.platform.includes("Linux") && err.message.includes("Failed to open")){
+                setTimeout(() => {
+                    const command = "<u><b>chmod 666 /dev/ttyUSB[n]</b></u>"
+                    this.showNotification(`use command <br>${command}<br> to enable reading/writing to this port`);
+                }, 500);
+            }
         })
     },
     updateButton: function(...buttonIDs){
@@ -214,6 +467,7 @@ let serialPortManager = {
         try{
             while(true){
                 const { value, done } = await reader.read();
+                //console.log(+new Date());
                 if(done){
                     // Allow the serial port to be closed later.
                     reader.releaseLock();
@@ -221,18 +475,41 @@ let serialPortManager = {
                 }
                 // value is a Uint8Array.
                 //console.log(value);
+                // const now = +new Date();
+                // console.log(now - this.timer, value.length);
+                // this.timer = now;
                 if(this.portStatus.reading){
-                    this.updateTerminalText(decoder.decode(value));
+                    if(this.decoder.currentType){
+                        let text = decoder.decode(value);
+                        this.updateTerminalText(text);
+                        this.fileContent += text;
+                        this.fileLength += text.length;
+                    }
+                    else{
+                        this.updateTerminalText(Array.from(value).map((e) => "0x" + `00${e.toString(16)}`.slice(-2)).join(" ") + " ");
+                    }
+                    for(let v of value){
+                        // if(this.fileLength > 1000){
+                        //     this.saveToFile(this.fileContent, "output.csv");
+                        //     this.fileContent = "";
+                        //     this.fileLength = 0;
+                        // }
+                        // this.fileContent += v + ";";
+                        // this.fileLength++;
+                        // if(this.fileLength % 10 === 0){
+                        //     this.fileContent += "\n";
+                        // }
+                    }
                 }
                 if(this.portStatus.drawing){
-                    oscilloscope.putBytesToArray(value);
+                    vacmeter.putBytesToArray(value);
                 }
                 // this.updateTerminalText(decoder.decode(value));
             }
         }
         catch(err){
-            this.showNotification(err);
-            console.error(err);
+            this.showNotification(err.message);
+            console.trace(err);
         }
     },
     updateTerminalText: function(text, reset = false){
@@ -251,6 +528,22 @@ let serialPortManager = {
     },
     terminalControls: function(id){
         switch(id){
+            case this.controlsIDs.decBaud:
+                this.port.currentBaudRate--;
+                if(this.port.currentBaudRate < 0){
+                    this.port.currentBaudRate = this.port.baudRates.length - 1;
+                }
+                this.port.portParams.baudRate = this.port.baudRates[this.port.currentBaudRate];
+                document.getElementById("baudRate").innerHTML = `${this.port.baudRates[this.port.currentBaudRate]} бод`;
+                break;
+            case this.controlsIDs.incBaud:
+                this.port.currentBaudRate++;
+                if(this.port.currentBaudRate >= this.port.baudRates.length){
+                    this.port.currentBaudRate = 0;
+                }
+                this.port.portParams.baudRate = this.port.baudRates[this.port.currentBaudRate];
+                document.getElementById("baudRate").innerHTML = `${this.port.baudRates[this.port.currentBaudRate]} бод`;
+                break;
             case this.controlsIDs.connect:
                 if(this.reader){
                     this.reader.cancel();
@@ -285,7 +578,7 @@ let serialPortManager = {
                     if(this.portStatus.reading){
                         this.portStatus.reading = false;
                         this.updateTerminalStatus({type: "text", value: "stopped"});
-                        this.updateButton(this.controlsIDs.startReading, this.controlsIDs.stopReading);
+                        this.updateButton(this.controlsIDs.startReading, this.controlsIDs.stopReading, this.controlsIDs.downloadText);
                     }
                     if(this.portStatus.drawing){
                         this.portStatus.drawing = false;
@@ -297,7 +590,7 @@ let serialPortManager = {
                     this.updateTerminalStatus({type: "device", value: "waiting"});
                     this.updateButton(this.controlsIDs.connect, this.controlsIDs.disconnect);
                     this.updateTerminalText("", true);
-                    oscilloscope.clearOsc();
+                    vacmeter.clearVac();
                 });
                 break;
             case this.controlsIDs.startReading:
@@ -306,7 +599,7 @@ let serialPortManager = {
                 }
                 this.portStatus.reading = true;
                 this.updateTerminalStatus({type: "text", value: "active"});
-                this.updateButton(this.controlsIDs.startReading, this.controlsIDs.stopReading);
+                this.updateButton(this.controlsIDs.startReading, this.controlsIDs.stopReading, this.controlsIDs.clearText, this.controlsIDs.downloadText);
                 if(!this.reader){
                     this.readData();
                 }
@@ -321,7 +614,28 @@ let serialPortManager = {
                     this.reader = undefined;
                 }
                 this.updateTerminalStatus({type: "text", value: "stopped"});
-                this.updateButton(this.controlsIDs.startReading, this.controlsIDs.stopReading);
+                this.updateButton(this.controlsIDs.startReading, this.controlsIDs.stopReading, this.controlsIDs.downloadText);
+                break;
+            case this.controlsIDs.clearText:
+                this.updateTerminalText("", true);
+                this.fileContent = "";
+                this.fileLength = 0;
+                if(!this.portStatus.reading || !this.portStatus.connected){
+                    this.updateButton(this.controlsIDs.clearText);
+                }
+                break;
+            case this.controlsIDs.downloadText:
+                if(!this.portStatus.reading){
+                    break;
+                }
+                this.saveToFile(this.fileContent, "output.csv");
+                this.fileContent = "";
+                this.fileLength = 0;
+                break;
+            case this.controlsIDs.decodeData:
+            case this.controlsIDs.decodeDataR:
+                this.decoder.currentType ^= 1;
+                document.getElementById("dataType").innerHTML = this.decoder.dataTypes[this.decoder.currentType];
                 break;
             case this.controlsIDs.startDrawing:
                 if(this.portStatus.drawing || !this.portStatus.connected){
@@ -351,15 +665,20 @@ let serialPortManager = {
         }
     },
     showNotification: function(text){
-        document.querySelector(".tooltip").innerHTML = text;
-        document.querySelector(".tooltip").classList.add("tooltip-enable");
+        let nt = document.createElement("div");
+        nt.classList.add("tooltip");
+        nt.innerHTML = text;
+        document.querySelector(".tooltips").append(nt);
+        setTimeout(() => {nt.classList.add("tooltip-enable");}, 10);
         setTimeout(() => {
-            document.querySelector(".tooltip").classList.remove("tooltip-enable");
-        }, 4000);
+            nt.classList.remove("tooltip-enable");
+            setTimeout(() => {nt.remove()}, 500);
+        }, 5000);
     },
 }
 
 oscilloscope.init();
+vacmeter.init();
 serialPortManager.init();
 
 function connectToUSB(){

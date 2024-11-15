@@ -30,6 +30,11 @@ body{
     margin-top: 20px;
 }
 
+.terminal-header{
+    font-size: 20px;
+    color: #ffffff;
+}
+
 .terminal-controls{
     display: flex;
     align-items: center;
@@ -38,7 +43,24 @@ body{
     user-select: none;
 }
 
+.terminal-controls__title{
+    display: none;
+}
+
 .terminal-controls__button{
+    padding: 10px 20px;
+    border-radius: 10px;
+    line-height: 20px;
+    background-color: #b92cc1;
+    color: #ffffff;
+}
+
+.terminal-controls__select{
+    display: flex;
+    gap: 5px;
+}
+
+.terminal-controls__text{
     padding: 10px 20px;
     border-radius: 10px;
     line-height: 20px;
@@ -58,8 +80,6 @@ body{
 
 .terminal__status{
     margin-left: auto;
-    display: flex;
-    gap: 10px;
 }
 
 .status{
@@ -67,13 +87,13 @@ body{
     width: 20px;
     border-radius: 50%;
     --active: #20f020;
-    --stopped: #f02020;
+    --stopped: #ff2020;
     --waiting: #5a5a5a;
 }
 
 .terminal-text{
-    max-height: 1000px;
-    overflow-y: hidden;
+    max-height: 400px;
+    overflow-y: scroll;
     word-break: break-word;
     padding: 10px;
     border: 2px solid #5c5cf3;
@@ -83,6 +103,7 @@ body{
     color: #ffffff;
     background-color: transparent;
     font-size: 15px;
+    scrollbar-width: none;
 }
 
 .terminal-text span::after {
@@ -102,16 +123,22 @@ svg{
 }
 
 .modal-container{
-    position: absolute;
+    position: fixed;
     top: 0;
     z-index: 1;
 }
 
-.tooltip{
+.tooltips{
     position: relative;
-    top: 0;
+    top: 50px;
     left: calc(50vw - 150px);
-    scale: 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tooltip{
+    opacity: 0;
     width: 300px;
     padding: 10px 20px;
     box-sizing: border-box;
@@ -123,9 +150,13 @@ svg{
     transition-duration: .5s;
 }
 
+.tooltip a{
+    color: #ffffff;
+    font-weight: bold;
+}
+
 .tooltip-enable{
-    top: 50px;
-    scale: 1 1;
+    opacity: 1;
 }
 
 .hidden{
@@ -135,5 +166,42 @@ svg{
 @keyframes cursor-blink {
     0% {
         opacity: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .wrapper{
+        padding: 20px 10px;
+    }
+    .terminal{
+        padding: 20px 10px;
+    }
+    .terminal-controls{
+        flex-direction: column;
+        align-items: unset;
+    }
+    .terminal-controls__title{
+        display: block;
+        color: #ffffff;
+        font-size: 14px;
+        flex: 1 1 100%;
+    }
+    .terminal-controls__select{
+        flex-wrap: wrap;
+    }
+    .terminal-controls__button, .terminal-controls__text{
+        padding: 10px;
+        border-radius: 5px;
+    }
+    .terminal__status{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 0;
+    }
+    .terminal__status::before{
+        content: "Статус";
+        color: #ffffff;
+        font-size: 14px;
     }
 }
